@@ -31,9 +31,9 @@ func main() {
 		go worker.Start(workerChan)
 	}
 
-	// Start a new working if one has stopped.
-	// read the channel, block until something is written,
-	// start a new goroutine
+	// Start a new worker if one has stopped:
+	//   read the channel, block until something is written,
+	//   check if worker is shutting down, start a new goroutine
 	go func() {
 		for worker := range workerChan {
 
@@ -50,7 +50,7 @@ func main() {
 		}
 	}()
 
-	// wait for 5 seconds to gracefully shutdown, then force
+	// wait for 15 seconds to gracefully shutdown, then force
 	wait := gracefulShutdown(cancel, 15*time.Second)
 	<-wait
 }
