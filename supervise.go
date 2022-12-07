@@ -36,9 +36,8 @@ func main() {
 	// start a new goroutine
 	go func() {
 		for worker := range workerChan {
-			select {
-			case <-ctx.Done():
-			default:
+
+			if !worker.shutdown {
 				// log the error
 				fmt.Printf("Worker %d stopped with err: %s\n", worker.id, worker.err)
 				// reset err
@@ -52,7 +51,7 @@ func main() {
 	}()
 
 	// wait for 5 seconds to gracefully shutdown, then force
-	wait := gracefulShutdown(cancel, 5*time.Second)
+	wait := gracefulShutdown(cancel, 15*time.Second)
 	<-wait
 }
 
@@ -107,9 +106,10 @@ func gracefulShutdown(cancel func(), timeout time.Duration) <-chan struct{} {
 // ----------------------------------------------------------------------------
 // simulated worker struct
 type Worker struct {
-	ctx context.Context
-	err error
-	id  int
+	ctx      context.Context
+	err      error
+	id       int
+	shutdown bool
 }
 
 // ----------------------------------------------------------------------------
@@ -128,7 +128,7 @@ func (worker *Worker) Start(workerChan chan<- *Worker) (err error) {
 		}
 		workerChan <- worker
 	}()
-
+	worker.shutdown = false
 	return worker.doWork()
 }
 
@@ -140,6 +140,7 @@ func (worker *Worker) doWork() (err error) {
 	for {
 		select {
 		case <-worker.ctx.Done():
+			worker.shutdown = true
 			// simulate handling the context being cancelled
 			now := time.Now()
 			fmt.Printf("Worker %d cancelled\n", worker.id)
