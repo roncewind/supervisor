@@ -18,6 +18,7 @@ func main() {
 	// make a buffered channel with the space for all workers
 	//  workers will signal on this channel if they die
 	workerChan := make(chan *Worker, numWorkers)
+	defer close(workerChan)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -31,14 +32,18 @@ func main() {
 		go worker.Start(workerChan)
 	}
 
-	// Start a new worker if one has stopped:
-	//   read the channel, block until something is written,
-	//   check if worker is shutting down, start a new goroutine
+	// Monitor a chan and start a new worker if one has stopped:
+	//   - read the channel
+	//	 - block until something is written
+	//   - check if worker is shutting down
+	//	 	- if not, re-start the worker
 	go func() {
 		shutdownCount := numWorkers
 		for worker := range workerChan {
 
-			if !worker.shutdown {
+			if worker.shutdown {
+				shutdownCount--
+			} else {
 				// log the error
 				fmt.Printf("Worker %d stopped with err: %s\n", worker.id, worker.err)
 				// reset err
@@ -47,8 +52,6 @@ func main() {
 				// a goroutine has ended, restart it
 				go worker.Start(workerChan)
 				fmt.Printf("Worker %d restarted\n", worker.id)
-			} else {
-				shutdownCount--
 			}
 
 			if shutdownCount == 0 {
@@ -58,19 +61,21 @@ func main() {
 		}
 	}()
 
-	// wait for 15 seconds to gracefully shutdown, then force
+	// when shutdown signalled, wait for 15 seconds for graceful shutdown
+	//	 to complete, then force
 	wait := gracefulShutdown(cancel, 15*time.Second)
 	<-wait
 }
 
 // ----------------------------------------------------------------------------
-// gracefulShutdown waits for terminating syscalls, then signals workers
+// gracefulShutdown waits for terminating syscalls then signals workers to shutdown
 func gracefulShutdown(cancel func(), timeout time.Duration) <-chan struct{} {
 	wait := make(chan struct{})
 
 	go func() {
 		defer close(wait)
 		sig := make(chan os.Signal, 1)
+		defer close(sig)
 
 		// PONDER: add any other syscalls?
 		// SIGHUP - hang up, lost controlling terminal
@@ -91,6 +96,7 @@ func gracefulShutdown(cancel func(), timeout time.Duration) <-chan struct{} {
 		}
 
 		timeoutSignal := make(chan struct{})
+		defer close(timeoutSignal)
 		// set timeout for the cleanup to be done to prevent system hang
 		timeoutFunc := time.AfterFunc(timeout, func() {
 			fmt.Printf("Timeout %.1fs have elapsed, force exit\n", timeout.Seconds())
