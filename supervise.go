@@ -14,8 +14,6 @@ import (
 // number of desired workers
 const numWorkers = 10
 
-var shutdownSignalled = false
-
 func main() {
 	// make a buffered channel with the space for all workers
 	//  workers will signal on this channel if they die
@@ -38,7 +36,9 @@ func main() {
 	// start a new goroutine
 	go func() {
 		for worker := range workerChan {
-			if !shutdownSignalled {
+			select {
+			case <-ctx.Done():
+			default:
 				// log the error
 				fmt.Printf("Worker %d stopped with err: %s\n", worker.id, worker.err)
 				// reset err
@@ -46,6 +46,7 @@ func main() {
 
 				// a goroutine has ended, restart it
 				go worker.Start(workerChan)
+				fmt.Printf("Worker %d restarted\n", worker.id)
 			}
 		}
 	}()
@@ -91,8 +92,6 @@ func gracefulShutdown(cancel func(), timeout time.Duration) <-chan struct{} {
 
 		defer timeoutFunc.Stop()
 
-		// signal shutdown
-		shutdownSignalled = true
 		// cancel the context
 		cancel()
 		fmt.Println("Shutdown signalled.")
