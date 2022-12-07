@@ -35,6 +35,7 @@ func main() {
 	//   read the channel, block until something is written,
 	//   check if worker is shutting down, start a new goroutine
 	go func() {
+		shutdownCount := numWorkers
 		for worker := range workerChan {
 
 			if !worker.shutdown {
@@ -46,6 +47,13 @@ func main() {
 				// a goroutine has ended, restart it
 				go worker.Start(workerChan)
 				fmt.Printf("Worker %d restarted\n", worker.id)
+			} else {
+				shutdownCount--
+			}
+
+			if shutdownCount == 0 {
+				fmt.Println("All workers shutdown, exiting")
+				os.Exit(0)
 			}
 		}
 	}()
