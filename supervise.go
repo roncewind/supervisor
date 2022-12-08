@@ -97,12 +97,11 @@ func gracefulShutdown(cancel func(), timeout time.Duration) <-chan struct{} {
 			fmt.Println("Killed with hang up")
 		}
 
-		timeoutSignal := make(chan struct{})
-		defer close(timeoutSignal)
 		// set timeout for the cleanup to be done to prevent system hang
+		timeoutSignal := make(chan struct{})
 		timeoutFunc := time.AfterFunc(timeout, func() {
 			fmt.Printf("Timeout %.1fs have elapsed, force exit\n", timeout.Seconds())
-			timeoutSignal <- struct{}{}
+			close(timeoutSignal)
 		})
 
 		defer timeoutFunc.Stop()
@@ -154,6 +153,7 @@ func (worker *Worker) Start(workerChan chan<- *Worker) (err error) {
 func (worker *Worker) doWork() (err error) {
 	// Worker simulation
 	for {
+		// use select to test if our context has completed
 		select {
 		case <-worker.ctx.Done():
 			worker.shutdown = true
@@ -164,23 +164,25 @@ func (worker *Worker) doWork() (err error) {
 			fmt.Printf("Worker %d shutdown with cancel, after %.1f.\n", worker.id, time.Since(now).Seconds())
 			return nil
 		default:
-			t := time.Now()
-			//simulate doing some work... max of 10 seconds
-			time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
-			q := rand.Intn(100)
-			if q < 10 {
-				// simulate 10% chance of panic
-				panic(fmt.Sprintf("with %d", q))
-			} else if q < 20 {
-				// simulate 10% chance of failure
-				return fmt.Errorf("error on %d", q)
-			} else if time.Since(t).Seconds() > 8 {
-				// simulate timeout
-				// if the work has taken more than 8 seconds, timeout
-				return errors.New("timeout")
-			} else {
-				fmt.Printf("Worker %d completed with %d.\n", worker.id, q)
-			}
+			// so we don't block until the case statements finish
+		}
+		// Now do whatever work we should do.
+		t := time.Now()
+		//simulate doing some work... max of 10 seconds
+		time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
+		q := rand.Intn(100)
+		if q < 10 {
+			// simulate 10% chance of panic
+			panic(fmt.Sprintf("with %d", q))
+		} else if q < 20 {
+			// simulate 10% chance of failure
+			return fmt.Errorf("error on %d", q)
+		} else if time.Since(t).Seconds() > 8 {
+			// simulate timeout
+			// if the work has taken more than 8 seconds, timeout
+			return errors.New("timeout")
+		} else {
+			fmt.Printf("Worker %d completed with %d.\n", worker.id, q)
 		}
 	}
 }
