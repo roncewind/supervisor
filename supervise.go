@@ -18,6 +18,8 @@ func main() {
 	// make a buffered channel with the space for all workers
 	//  workers will signal on this channel if they die
 	workerChan := make(chan *Worker, numWorkers)
+	// PONDER:  close the workerChan here or in the goroutine?
+	//  probably doesn't matter in this case, but something to keep an eye on.
 	defer close(workerChan)
 
 	ctx, cancel := context.WithCancel(context.Background())
