@@ -2,19 +2,14 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"math/rand"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 )
 
-// number of desired workers
-const numWorkers = 10
-
-func main() {
+func StartSupervisor(numWorkers int, work func(int) error, shutdown func(int)) {
 	// make a buffered channel with the space for all workers
 	//  workers will signal on this channel if they die
 	workerChan := make(chan *Worker, numWorkers)
@@ -31,7 +26,7 @@ func main() {
 			ctx: ctx,
 			id:  i,
 		}
-		go worker.Start(workerChan)
+		go worker.Start(workerChan, work, shutdown)
 	}
 
 	// Monitor a chan and start a new worker if one has stopped:
@@ -52,13 +47,13 @@ func main() {
 				worker.err = nil
 
 				// a goroutine has ended, restart it
-				go worker.Start(workerChan)
+				go worker.Start(workerChan, work, shutdown)
 				fmt.Printf("Worker %d restarted\n", worker.id)
 			}
 
 			if shutdownCount == 0 {
 				fmt.Println("All workers shutdown, exiting")
-				os.Exit(0)
+				os.Exit(0) //FIXME: rework shutdown
 			}
 		}
 	}()
@@ -129,7 +124,7 @@ type Worker struct {
 
 // ----------------------------------------------------------------------------
 // this function can start a new worker and re-start a worker if it's failed
-func (worker *Worker) Start(workerChan chan<- *Worker) (err error) {
+func (worker *Worker) Start(workerChan chan<- *Worker, work func(int) error, shutdown func(int)) (err error) {
 	// make the goroutine signal its death, whether it's a panic or a return
 	defer func() {
 		if r := recover(); r != nil {
@@ -144,45 +139,27 @@ func (worker *Worker) Start(workerChan chan<- *Worker) (err error) {
 		workerChan <- worker
 	}()
 	worker.shutdown = false
-	return worker.doWork()
+	return worker.doWork(work, shutdown)
 }
 
 // ----------------------------------------------------------------------------
 // this function simulates do work as a worker
 // PONDER:  private function, should only be called from Start?
-func (worker *Worker) doWork() (err error) {
+func (worker *Worker) doWork(work func(int) error, shutdown func(int)) (err error) {
 	// Worker simulation
 	for {
 		// use select to test if our context has completed
 		select {
 		case <-worker.ctx.Done():
 			worker.shutdown = true
-			// simulate handling the context being cancelled
-			now := time.Now()
-			fmt.Printf("Worker %d cancelled\n", worker.id)
-			time.Sleep(time.Duration(rand.Intn(5)) * time.Second)
-			fmt.Printf("Worker %d shutdown with cancel, after %.1f.\n", worker.id, time.Since(now).Seconds())
+			shutdown(worker.id)
 			return nil
 		default:
 			// so we don't block until the case statements finish
 		}
-		// Now do whatever work we should do.
-		t := time.Now()
-		//simulate doing some work... max of 10 seconds
-		time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
-		q := rand.Intn(100)
-		if q < 10 {
-			// simulate 10% chance of panic
-			panic(fmt.Sprintf("with %d", q))
-		} else if q < 20 {
-			// simulate 10% chance of failure
-			return fmt.Errorf("error on %d", q)
-		} else if time.Since(t).Seconds() > 8 {
-			// simulate timeout
-			// if the work has taken more than 8 seconds, timeout
-			return errors.New("timeout")
-		} else {
-			fmt.Printf("Worker %d completed with %d.\n", worker.id, q)
+		err := work(worker.id)
+		if err != nil {
+			return err
 		}
 	}
 }
