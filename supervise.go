@@ -18,6 +18,7 @@ type Worker struct {
 	shutdown bool
 }
 
+// ----------------------------------------------------------------------------
 func StartSupervisor(numWorkers int) {
 	// make a buffered channel with the space for all workers
 	//  workers will signal on this channel if they die
