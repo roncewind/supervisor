@@ -9,7 +9,16 @@ import (
 	"time"
 )
 
-func StartSupervisor(numWorkers int, work func(int) error, shutdown func(int)) {
+// ----------------------------------------------------------------------------
+// simulated worker struct
+type Worker struct {
+	ctx      context.Context
+	err      error
+	id       int
+	shutdown bool
+}
+
+func StartSupervisor(numWorkers int) {
 	// make a buffered channel with the space for all workers
 	//  workers will signal on this channel if they die
 	workerChan := make(chan *Worker, numWorkers)
@@ -26,7 +35,7 @@ func StartSupervisor(numWorkers int, work func(int) error, shutdown func(int)) {
 			ctx: ctx,
 			id:  i,
 		}
-		go worker.Start(workerChan, work, shutdown)
+		go worker.Start(workerChan)
 	}
 
 	// Monitor a chan and start a new worker if one has stopped:
@@ -47,7 +56,7 @@ func StartSupervisor(numWorkers int, work func(int) error, shutdown func(int)) {
 				worker.err = nil
 
 				// a goroutine has ended, restart it
-				go worker.Start(workerChan, work, shutdown)
+				go worker.Start(workerChan)
 				fmt.Printf("Worker %d restarted\n", worker.id)
 			}
 
@@ -114,17 +123,8 @@ func gracefulShutdown(cancel func(), timeout time.Duration) <-chan struct{} {
 }
 
 // ----------------------------------------------------------------------------
-// simulated worker struct
-type Worker struct {
-	ctx      context.Context
-	err      error
-	id       int
-	shutdown bool
-}
-
-// ----------------------------------------------------------------------------
 // this function can start a new worker and re-start a worker if it's failed
-func (worker *Worker) Start(workerChan chan<- *Worker, work func(int) error, shutdown func(int)) (err error) {
+func (worker *Worker) Start(workerChan chan<- *Worker) (err error) {
 	// make the goroutine signal its death, whether it's a panic or a return
 	defer func() {
 		if r := recover(); r != nil {
@@ -139,27 +139,5 @@ func (worker *Worker) Start(workerChan chan<- *Worker, work func(int) error, shu
 		workerChan <- worker
 	}()
 	worker.shutdown = false
-	return worker.doWork(work, shutdown)
-}
-
-// ----------------------------------------------------------------------------
-// this function simulates do work as a worker
-// PONDER:  private function, should only be called from Start?
-func (worker *Worker) doWork(work func(int) error, shutdown func(int)) (err error) {
-	// Worker simulation
-	for {
-		// use select to test if our context has completed
-		select {
-		case <-worker.ctx.Done():
-			worker.shutdown = true
-			shutdown(worker.id)
-			return nil
-		default:
-			// so we don't block until the case statements finish
-		}
-		err := work(worker.id)
-		if err != nil {
-			return err
-		}
-	}
+	return worker.doWork()
 }
