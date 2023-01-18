@@ -77,10 +77,10 @@ func StartSupervisor(newWorker func(ctx context.Context, id string) Worker, numW
 // ----------------------------------------------------------------------------
 // gracefulShutdown waits for terminating syscalls then signals workers to shutdown
 func gracefulShutdown(cancel func(), timeout time.Duration) chan struct{} {
-	wait := make(chan struct{})
+	sigShutdown := make(chan struct{})
 
 	go func() {
-		defer close(wait)
+		defer close(sigShutdown)
 		sig := make(chan os.Signal, 1)
 		defer close(sig)
 
@@ -117,10 +117,10 @@ func gracefulShutdown(cancel func(), timeout time.Duration) chan struct{} {
 
 		// wait for timeout to finish and exit
 		<-timeoutSignal
-		wait <- struct{}{}
+		sigShutdown <- struct{}{}
 	}()
 
-	return wait
+	return sigShutdown
 }
 
 // ----------------------------------------------------------------------------
