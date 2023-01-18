@@ -121,5 +121,5 @@ func main() {
 		fmt.Println("**** all jobs submitted ****")
 	}()
 
-	StartSupervisor(NewSimulatedWorker, numWorkers)
+	StartSupervisor(NewSimulatedWorker, numWorkers, 15)
 }

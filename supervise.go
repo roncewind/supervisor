@@ -21,7 +21,7 @@ type Worker interface {
 }
 
 // ----------------------------------------------------------------------------
-func StartSupervisor(newWorker func(ctx context.Context, id string) Worker, numWorkers int) {
+func StartSupervisor(newWorker func(ctx context.Context, id string) Worker, numWorkers int, shutdownTimeout time.Duration) {
 	// make a buffered channel with the space for all workers
 	//  workers will signal on this channel if they die
 	workerChan := make(chan *Worker, numWorkers)
@@ -40,7 +40,7 @@ func StartSupervisor(newWorker func(ctx context.Context, id string) Worker, numW
 
 	// when shutdown signalled, wait for 15 seconds for graceful shutdown
 	//	 to complete, then force
-	sigShutdown := gracefulShutdown(cancel, 15*time.Second)
+	sigShutdown := gracefulShutdown(cancel, shutdownTimeout*time.Second)
 
 	// Monitor a chan and start a new worker if one has stopped:
 	//   - read the channel
