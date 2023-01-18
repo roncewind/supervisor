@@ -116,7 +116,7 @@ func gracefulShutdown(cancel func(), timeout time.Duration) <-chan struct{} {
 
 		// wait for timeout to finish and exit
 		<-timeoutSignal
-		os.Exit(0)
+		wait <- struct{}{}
 	}()
 
 	return wait
@@ -134,6 +134,8 @@ func Start(worker Worker, workerChan chan<- *Worker) (err error) {
 				worker.setError(fmt.Errorf("panic happened %v", r))
 			}
 		} else {
+			// a little tricky go code here.
+			//  err is picked up from the doWork return
 			worker.setError(err)
 		}
 		workerChan <- &worker
