@@ -11,13 +11,13 @@ import (
 
 // ----------------------------------------------------------------------------
 type Worker interface {
+	doWork() error
 	getContext() context.Context
 	getId() string
-	setError(error)
 	getError() error
-	setShutdown(bool)
+	setError(error)
 	getShutdown() bool
-	doWork() error
+	setShutdown(bool)
 }
 
 // ----------------------------------------------------------------------------
