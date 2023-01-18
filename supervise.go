@@ -10,16 +10,18 @@ import (
 )
 
 // ----------------------------------------------------------------------------
-// simulated worker struct
-type Worker struct {
-	ctx      context.Context
-	err      error
-	id       int
-	shutdown bool
+type Worker interface {
+	getContext() context.Context
+	getId() string
+	setError(error)
+	getError() error
+	setShutdown(bool)
+	getShutdown() bool
+	doWork() error
 }
 
 // ----------------------------------------------------------------------------
-func StartSupervisor(numWorkers int) {
+func StartSupervisor(newWorker func(context.Context, string) Worker, numWorkers int) {
 	// make a buffered channel with the space for all workers
 	//  workers will signal on this channel if they die
 	workerChan := make(chan *Worker, numWorkers)
@@ -31,12 +33,9 @@ func StartSupervisor(numWorkers int) {
 
 	// start up a number of workers.
 	for i := 0; i < numWorkers; i++ {
-		i := i
-		worker := &Worker{
-			ctx: ctx,
-			id:  i,
-		}
-		go worker.Start(workerChan)
+		id := fmt.Sprintf("worker-%d", i)
+		worker := newWorker(ctx, id)
+		go Start(worker, workerChan)
 	}
 
 	// Monitor a chan and start a new worker if one has stopped:
@@ -48,17 +47,17 @@ func StartSupervisor(numWorkers int) {
 		shutdownCount := numWorkers
 		for worker := range workerChan {
 
-			if worker.shutdown {
+			if (*worker).getShutdown() {
 				shutdownCount--
 			} else {
 				// log the error
-				fmt.Printf("Worker %d stopped with err: %s\n", worker.id, worker.err)
+				fmt.Printf("Worker %v stopped with err: %s\n", (*worker).getId(), (*worker).getError())
 				// reset err
-				worker.err = nil
+				(*worker).setError(nil)
 
 				// a goroutine has ended, restart it
-				go worker.Start(workerChan)
-				fmt.Printf("Worker %d restarted\n", worker.id)
+				go Start(*worker, workerChan)
+				fmt.Printf("Worker %s restarted\n", (*worker).getId())
 			}
 
 			if shutdownCount == 0 {
@@ -125,20 +124,20 @@ func gracefulShutdown(cancel func(), timeout time.Duration) <-chan struct{} {
 
 // ----------------------------------------------------------------------------
 // this function can start a new worker and re-start a worker if it's failed
-func (worker *Worker) Start(workerChan chan<- *Worker) (err error) {
+func Start(worker Worker, workerChan chan<- *Worker) (err error) {
 	// make the goroutine signal its death, whether it's a panic or a return
 	defer func() {
 		if r := recover(); r != nil {
 			if err, ok := r.(error); ok {
-				worker.err = err
+				worker.setError(err)
 			} else {
-				worker.err = fmt.Errorf("panic happened %v", r)
+				worker.setError(fmt.Errorf("panic happened %v", r))
 			}
 		} else {
-			worker.err = err
+			worker.setError(err)
 		}
-		workerChan <- worker
+		workerChan <- &worker
 	}()
-	worker.shutdown = false
+	worker.setShutdown(false)
 	return worker.doWork()
 }
