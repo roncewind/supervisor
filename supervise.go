@@ -38,6 +38,10 @@ func StartSupervisor(newWorker func(context.Context, string) Worker, numWorkers 
 		go Start(worker, workerChan)
 	}
 
+	// when shutdown signalled, wait for 15 seconds for graceful shutdown
+	//	 to complete, then force
+	sigShutdown := gracefulShutdown(cancel, 15*time.Second)
+
 	// Monitor a chan and start a new worker if one has stopped:
 	//   - read the channel
 	//	 - block until something is written
@@ -62,20 +66,17 @@ func StartSupervisor(newWorker func(context.Context, string) Worker, numWorkers 
 
 			if shutdownCount == 0 {
 				fmt.Println("All workers shutdown, exiting")
-				os.Exit(0) //FIXME: rework shutdown
+				sigShutdown <- struct{}{}
 			}
 		}
 	}()
 
-	// when shutdown signalled, wait for 15 seconds for graceful shutdown
-	//	 to complete, then force
-	wait := gracefulShutdown(cancel, 15*time.Second)
-	<-wait
+	<-sigShutdown
 }
 
 // ----------------------------------------------------------------------------
 // gracefulShutdown waits for terminating syscalls then signals workers to shutdown
-func gracefulShutdown(cancel func(), timeout time.Duration) <-chan struct{} {
+func gracefulShutdown(cancel func(), timeout time.Duration) chan struct{} {
 	wait := make(chan struct{})
 
 	go func() {
