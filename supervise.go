@@ -38,7 +38,7 @@ func StartSupervisor(newWorker func(ctx context.Context, id string) Worker, numW
 		go Start(worker, workerChan)
 	}
 
-	// when shutdown signalled, wait for 15 seconds for graceful shutdown
+	// when shutdown signalled, wait for `shutdownTimeout` seconds for graceful shutdown
 	//	 to complete, then force
 	sigShutdown := gracefulShutdown(cancel, shutdownTimeout*time.Second)
 
