@@ -21,7 +21,7 @@ type Worker interface {
 }
 
 // ----------------------------------------------------------------------------
-func StartSupervisor(newWorker func(context.Context, string) Worker, numWorkers int) {
+func StartSupervisor(newWorker func(ctx context.Context, id string) Worker, numWorkers int) {
 	// make a buffered channel with the space for all workers
 	//  workers will signal on this channel if they die
 	workerChan := make(chan *Worker, numWorkers)
@@ -55,13 +55,13 @@ func StartSupervisor(newWorker func(context.Context, string) Worker, numWorkers 
 				shutdownCount--
 			} else {
 				// log the error
-				fmt.Printf("Worker %v stopped with err: %s\n", (*worker).getId(), (*worker).getError())
+				fmt.Printf("%v stopped with err: %s\n", (*worker).getId(), (*worker).getError())
 				// reset err
 				(*worker).setError(nil)
 
 				// a goroutine has ended, restart it
 				go Start(*worker, workerChan)
-				fmt.Printf("Worker %s restarted\n", (*worker).getId())
+				fmt.Printf("%v restarted\n", (*worker).getId())
 			}
 
 			if shutdownCount == 0 {

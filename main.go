@@ -68,7 +68,7 @@ func (worker *simulatedWorker) doWork() (err error) {
 		case myWork := <-workQueue:
 			// Now do whatever work we should do.
 			t := time.Now()
-			fmt.Println("Worker", worker.id, "has", myWork, "work to do")
+			fmt.Println(worker.id, "has", myWork, "work to do")
 			//simulate doing some work... max of 10 seconds
 			time.Sleep(time.Duration(myWork) * time.Second)
 			q := rand.Intn(100)
@@ -85,13 +85,13 @@ func (worker *simulatedWorker) doWork() (err error) {
 			} else if since := time.Since(t).Seconds(); since > workerTimeout {
 				// failed work unit
 				workQueue <- myWork
-				fmt.Println("Worker", worker.id, "timeout:", since, ">", workerTimeout)
+				fmt.Println(worker.id, "timeout:", since, ">", workerTimeout)
 				// simulate timeout extension
 				workerTimeout = workerTimeout + 2
 				// if the work has taken more than allow timeout, return a timeout error
 				return errors.New("timeout")
 			} else {
-				fmt.Printf("Worker %v completed with %d.\n", worker.id, q)
+				fmt.Printf("%v completed with %d.\n", worker.id, q)
 			}
 		}
 	}
@@ -101,9 +101,9 @@ func (worker *simulatedWorker) doWork() (err error) {
 func shutdown(id string) {
 	// simulate handling the context being cancelled
 	now := time.Now()
-	fmt.Printf("Worker %s cancelled\n", id)
+	fmt.Printf("%v cancelled\n", id)
 	time.Sleep(time.Duration(rand.Intn(5)) * time.Second)
-	fmt.Printf("Worker %s shutdown with cancel, after %.1f.\n", id, time.Since(now).Seconds())
+	fmt.Printf("%v shutdown with cancel, after %.1f.\n", id, time.Since(now).Seconds())
 }
 
 // ----------------------------------------------------------------------------
