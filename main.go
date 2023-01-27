@@ -69,25 +69,42 @@ func (worker *simulatedWorker) doWork() (err error) {
 			// Now do whatever work we should do.
 			t := time.Now()
 			fmt.Println(worker.id, "has", myWork, "work to do")
-			//simulate doing some work... max of 10 seconds
+			//simulate doing some work... for "myWork" number of seconds
 			time.Sleep(time.Duration(myWork) * time.Second)
 			q := rand.Intn(100)
+			// fmt.Println(worker.id, "q:", q, "since:", time.Since(t).Seconds(), "workerTimeout:", workerTimeout)
 			if q < 10 {
-				// failed work unit, NACK simulation
-				workQueue <- myWork
+				select {
+				// failed work unit
+				case workQueue <- myWork:
+					// fmt.Println("Putting work back on workQueue")
+				default:
+					fmt.Println("ERROR:  workQueue blocked... work unit lost")
+				}
 				// simulate 10% chance of panic
 				panic(fmt.Sprintf("with %d", q))
 			} else if q < 20 {
+				select {
 				// failed work unit
-				workQueue <- myWork
+				case workQueue <- myWork:
+					// fmt.Println("Putting work back on workQueue")
+				default:
+					fmt.Println("ERROR:  workQueue blocked... work unit lost")
+				}
 				// simulate 10% chance of failure
 				return fmt.Errorf("error on %d", q)
 			} else if since := time.Since(t).Seconds(); since > workerTimeout {
+				select {
 				// failed work unit
-				workQueue <- myWork
+				case workQueue <- myWork:
+					// fmt.Println("Putting work back on workQueue")
+				default:
+					fmt.Println("ERROR:  workQueue blocked... work unit lost")
+				}
 				fmt.Println(worker.id, "timeout:", since, ">", workerTimeout)
 				// simulate timeout extension
 				workerTimeout = workerTimeout + 2
+				fmt.Println(worker.id, "workerTimeout extended to ", workerTimeout)
 				// if the work has taken more than allow timeout, return a timeout error
 				return errors.New("timeout")
 			} else {
@@ -112,14 +129,14 @@ func main() {
 	numWorkers := 10
 
 	//create a few "work items" and put in the queue
-	workQueue = make(chan int)
+	workQueue = make(chan int, numWorkers)
 	go func() {
 		for i := 0; i < 10; i++ {
-			workQueue <- rand.Intn(10)
+			workQueue <- rand.Intn(15)
 			time.Sleep(time.Duration(rand.Intn(5)) * time.Second)
 		}
 		fmt.Println("**** all jobs submitted ****")
 	}()
 
-	StartSupervisor(NewSimulatedWorker, numWorkers, 15)
+	StartSupervisor(NewSimulatedWorker, numWorkers, 60)
 }

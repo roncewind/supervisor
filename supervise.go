@@ -20,14 +20,18 @@ type Worker interface {
 	setShutdown(bool)
 }
 
+// type newWorker func(ctx context.Context, id string)
+// type Supervisor struct {
+// 	newWorker
+// 	numWorkers      int
+// 	shutdownTimeout time.Duration
+// }
+
 // ----------------------------------------------------------------------------
 func StartSupervisor(newWorker func(ctx context.Context, id string) Worker, numWorkers int, shutdownTimeout time.Duration) {
 	// make a buffered channel with the space for all workers
 	//  workers will signal on this channel if they die
 	workerChan := make(chan *Worker, numWorkers)
-	// PONDER:  close the workerChan here or in the goroutine?
-	//  probably doesn't matter in this case, but something to keep an eye on.
-	defer close(workerChan)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -50,8 +54,8 @@ func StartSupervisor(newWorker func(ctx context.Context, id string) Worker, numW
 	go func() {
 		shutdownCount := numWorkers
 		for worker := range workerChan {
-
 			if (*worker).getShutdown() {
+				fmt.Printf("%v is shutdown\n", (*worker).getId())
 				shutdownCount--
 			} else {
 				// log the error
@@ -66,6 +70,7 @@ func StartSupervisor(newWorker func(ctx context.Context, id string) Worker, numW
 
 			if shutdownCount == 0 {
 				fmt.Println("All workers shutdown, exiting")
+				close(workerChan)
 				sigShutdown <- struct{}{}
 			}
 		}
