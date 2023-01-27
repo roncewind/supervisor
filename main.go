@@ -74,37 +74,38 @@ func (worker *simulatedWorker) doWork() (err error) {
 			q := rand.Intn(100)
 			// fmt.Println(worker.id, "q:", q, "since:", time.Since(t).Seconds(), "workerTimeout:", workerTimeout)
 			if q < 10 {
-				select {
 				// failed work unit
-				case workQueue <- myWork:
-					// fmt.Println("Putting work back on workQueue")
-				default:
-					fmt.Println("ERROR:  workQueue blocked... work unit lost")
-				}
+				// re-queue the work unit for re-processing.
+				// this blocks if the work queue is full.
+				workQueue <- myWork
 				// simulate 10% chance of panic
 				panic(fmt.Sprintf("with %d", q))
 			} else if q < 20 {
-				select {
 				// failed work unit
-				case workQueue <- myWork:
-					// fmt.Println("Putting work back on workQueue")
-				default:
-					fmt.Println("ERROR:  workQueue blocked... work unit lost")
-				}
+				// re-queue the work unit for re-processing.
+				// this blocks if the work queue is full.
+				workQueue <- myWork
 				// simulate 10% chance of failure
 				return fmt.Errorf("error on %d", q)
 			} else if since := time.Since(t).Seconds(); since > workerTimeout {
-				select {
-				// failed work unit
-				case workQueue <- myWork:
-					// fmt.Println("Putting work back on workQueue")
-				default:
-					fmt.Println("ERROR:  workQueue blocked... work unit lost")
-				}
 				fmt.Println(worker.id, "timeout:", since, ">", workerTimeout)
 				// simulate timeout extension
 				workerTimeout = workerTimeout + 2
 				fmt.Println(worker.id, "workerTimeout extended to ", workerTimeout)
+				// PONDER:  It could be that our worker needs to be "richer"
+				// and simulate a cumulative amount of work time and continue
+				// to work until some "hard stop" amount of time.  It might be
+				// that we need to signal a queue to extend our time, but
+				// keep working.  all that sort of logic would need to go here.
+
+				// fail the work unit
+				// re-queue the work unit for re-processing.
+				// this blocks if the work queue is full.
+				workQueue <- myWork
+				// PONDER:  this will lead to a subtle error when shutting down
+				// the work unit will be lost, but since this is a simulated
+				// worker, there's no problem.
+
 				// if the work has taken more than allow timeout, return a timeout error
 				return errors.New("timeout")
 			} else {
