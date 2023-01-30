@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"runtime"
 	"time"
 )
 
@@ -110,6 +111,7 @@ func (worker *simulatedWorker) doWork() (err error) {
 				return errors.New("timeout")
 			} else {
 				fmt.Printf("%v completed with %d.\n", worker.id, q)
+				emitRuntimeStats("Work complete")
 			}
 		}
 	}
@@ -140,4 +142,22 @@ func main() {
 	}()
 
 	StartSupervisor(NewSimulatedWorker, numWorkers, 60)
+	emitRuntimeStats("End main")
+}
+
+// ----------------------------------------------------------------------------
+func emitRuntimeStats(label string) {
+	var stats runtime.MemStats
+	runtime.ReadMemStats(&stats)
+	fmt.Println("=====================================")
+	fmt.Println("===", label)
+	fmt.Println("= Num Gorouting:", runtime.NumGoroutine())
+	fmt.Println("= alloc_bytes:", stats.Alloc)
+	fmt.Println("= sys_bytes:", stats.Sys)
+	fmt.Println("= malloc_count:", stats.Mallocs)
+	fmt.Println("= free_count:", stats.Frees)
+	fmt.Println("= heap_objects:", stats.HeapObjects)
+	fmt.Println("= total_gc_pause_ns:", stats.PauseTotalNs)
+	fmt.Println("= total_gc_runs:", stats.NumGC)
+	fmt.Println("=====================================")
 }
