@@ -142,7 +142,7 @@ func main() {
 		fmt.Println("**** all jobs submitted ****")
 	}()
 
-	StartSupervisor(NewSimulatedWorker, numWorkers, 60)
+	<-StartSupervisor(NewSimulatedWorker, numWorkers, 60)
 	emitRuntimeStats("End main")
 	emitMetrics()
 }

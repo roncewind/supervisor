@@ -28,7 +28,7 @@ type Worker interface {
 // }
 
 // ----------------------------------------------------------------------------
-func StartSupervisor(newWorker func(ctx context.Context, id string) Worker, numWorkers int, shutdownTimeout time.Duration) {
+func StartSupervisor(newWorker func(ctx context.Context, id string) Worker, numWorkers int, shutdownTimeout time.Duration) chan struct{} {
 	// make a buffered channel with the space for all workers
 	//  workers will signal on this channel if they die
 	workerChan := make(chan *Worker, numWorkers)
@@ -76,7 +76,7 @@ func StartSupervisor(newWorker func(ctx context.Context, id string) Worker, numW
 		}
 	}()
 
-	<-sigShutdown
+	return sigShutdown
 }
 
 // ----------------------------------------------------------------------------
