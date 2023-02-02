@@ -20,13 +20,6 @@ type Worker interface {
 	setShutdown(bool)
 }
 
-// type newWorker func(ctx context.Context, id string)
-// type Supervisor struct {
-// 	newWorker
-// 	numWorkers      int
-// 	shutdownTimeout time.Duration
-// }
-
 // ----------------------------------------------------------------------------
 func StartSupervisor(newWorker func(ctx context.Context, id string) Worker, numWorkers int, shutdownTimeout time.Duration) chan struct{} {
 	// make a buffered channel with the space for all workers
